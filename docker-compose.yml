@@ -12,10 +12,15 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
 
   api:
     build: ./api
     container_name: goum-api
+    # Not published to the host — only reachable via the web proxy on the Docker network
+    expose:
+      - "8080"
     env_file:
       - .env
     volumes:
@@ -29,3 +34,8 @@ services:
       DOMAIN: ${DOMAIN:-goum.eu}
       SITE_URL: ${SITE_URL:-}
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true

@@ -3,21 +3,39 @@
   const mailNode = document.querySelector("[data-contact-mail]");
   const youtubeNode = document.querySelector("[data-youtube]");
 
+  const safeHttpsUrl = (value) => {
+    try {
+      const u = new URL(String(value || "").trim());
+      if (u.protocol !== "https:") return null;
+      if (u.username || u.password) return null;
+      return u.href;
+    } catch {
+      return null;
+    }
+  };
+
+  const safeMailto = (value) => {
+    const mail = String(value || "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) return null;
+    if (/[\r\n]/.test(mail)) return null;
+    return mail;
+  };
+
   const applyContact = (data) => {
-    const phone = (data.contact_phone || "").trim();
-    const mail = (data.contact_mail || "").trim();
-    const youtube = (data.youtube_url || "").trim();
+    const phone = String(data.contact_phone || "").trim();
+    const mail = safeMailto(data.contact_mail);
+    const youtube = safeHttpsUrl(data.youtube_url);
 
     if (phoneNode) {
       phoneNode.textContent = phone || "—";
       const tel = phone.replace(/[^\d+]/g, "");
-      if (tel) phoneNode.setAttribute("href", `tel:${tel}`);
+      if (tel && tel.length >= 6) phoneNode.setAttribute("href", `tel:${tel}`);
       else phoneNode.removeAttribute("href");
     }
 
     if (mailNode) {
       mailNode.textContent = mail || "—";
-      if (mail) mailNode.setAttribute("href", `mailto:${mail}`);
+      if (mail) mailNode.setAttribute("href", `mailto:${encodeURIComponent(mail).replace(/%40/g, "@")}`);
       else mailNode.removeAttribute("href");
     }
 

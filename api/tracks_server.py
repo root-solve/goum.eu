@@ -129,6 +129,22 @@ def build_track(path: Path) -> dict:
     return track
 
 
+def _is_safe_mp3(path: Path) -> bool:
+    """Only real .mp3 files contained under MP3_DIR (no symlink escape)."""
+    try:
+        if not path.is_file() or path.is_symlink():
+            return False
+        if path.suffix.lower() != ".mp3" or path.name.startswith("."):
+            return False
+        if "/" in path.name or "\\" in path.name or path.name in (".", ".."):
+            return False
+        root = MP3_DIR.resolve(strict=True)
+        resolved = path.resolve(strict=True)
+        return resolved.is_relative_to(root)
+    except OSError:
+        return False
+
+
 def list_tracks() -> list[dict]:
     if not MP3_DIR.is_dir():
         return []
@@ -137,11 +153,7 @@ def list_tracks() -> list[dict]:
     tracks: list[dict] = []
 
     for path in MP3_DIR.iterdir():
-        if not path.is_file():
-            continue
-        if path.suffix.lower() != ".mp3":
-            continue
-        if path.name.startswith("."):
+        if not _is_safe_mp3(path):
             continue
 
         key = path.name
@@ -185,16 +197,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", cache)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(body)
-
-    def do_OPTIONS(self) -> None:
-        self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.end_headers()
 
     def do_GET(self) -> None:
         path = urllib.parse.urlparse(self.path).path.rstrip("/") or "/"
@@ -206,19 +211,37 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, {"count": len(tracks), "tracks": tracks})
             return
         if path in ("/site", "/api/site"):
+            yt = None
+            if YOUTUBE_URL.startswith("https://") and "\n" not in YOUTUBE_URL:
+                try:
+                    parsed = urllib.parse.urlparse(YOUTUBE_URL)
+                    if parsed.scheme == "https" and parsed.netloc and not parsed.username:
+                        yt = YOUTUBE_URL
+                except ValueError:
+                    yt = None
+            mail = (
+                CONTACT_MAIL
+                if re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", CONTACT_MAIL)
+                else None
+            )
+            phone = (
+                CONTACT_PHONE
+                if CONTACT_PHONE and not re.search(r"[\r\n]", CONTACT_PHONE)
+                else None
+            )
             self._send(
                 200,
                 {
                     "domain": DOMAIN,
                     "site_url": SITE_URL,
-                    "contact_mail": CONTACT_MAIL or None,
-                    "contact_phone": CONTACT_PHONE or None,
-                    "youtube_url": YOUTUBE_URL or None,
+                    "contact_mail": mail,
+                    "contact_phone": phone,
+                    "youtube_url": yt,
                 },
             )
             return
         if path in ("/health", "/api/health"):
-            self._send(200, {"ok": True, "mp3_dir": str(MP3_DIR)})
+            self._send(200, {"ok": True})
             return
         self._send(404, {"error": "not found"})
 

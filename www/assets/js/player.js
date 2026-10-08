@@ -165,13 +165,31 @@
     els.play.textContent = playing ? "Pause" : "Play";
   };
 
+  const safeMediaUrl = (url) => {
+    try {
+      const u = new URL(String(url || ""), window.location.origin);
+      if (u.origin !== window.location.origin) return null;
+      if (!u.pathname.startsWith("/mp3/")) return null;
+      if (u.pathname.includes("..")) return null;
+      return u.pathname + u.search;
+    } catch {
+      return null;
+    }
+  };
+
   const load = (index, autoplay = false) => {
     if (!state.tracks.length) return;
     state.index =
       ((index % state.tracks.length) + state.tracks.length) %
       state.tracks.length;
     const track = state.tracks[state.index];
-    els.audio.src = track.url;
+    const src = safeMediaUrl(track.url);
+    if (!src) {
+      setStatus("Fichier audio invalide.");
+      setPlayingUi(false);
+      return;
+    }
+    els.audio.src = src;
     els.audio.load();
     syncNow();
     if (autoplay) {

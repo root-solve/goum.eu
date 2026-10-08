@@ -55,3 +55,10 @@ deploy/        # scripts Apache / Certbot
 ```
 
 Éditer HTML/CSS/JS ou ajouter des mp3 sur l’hôte suffit — pas de rebuild pour le contenu.
+
+## Sécurité (rappel prod)
+
+- `make deploy` publie le site en **127.0.0.1** seulement ; Apache termine le TLS.
+- L’API n’est **pas** exposée sur l’hôte (uniquement via nginx `/api/`).
+- Ne pas committer `.env` ; mp3 hors git.
+- Après deploy : vérifier HSTS / HTTPS et que le port `HTTP_PORT` n’est pas ouvert publiquement.
