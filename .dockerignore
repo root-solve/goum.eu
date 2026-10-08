@@ -1,0 +1,5 @@
+.git
+www
+**/*.bak
+**/node_modules
+README.md

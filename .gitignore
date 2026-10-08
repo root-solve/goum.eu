@@ -1,0 +1,7 @@
+.DS_Store
+*.log
+.env
+
+# Music stays local — drop files in www/mp3 without committing
+www/mp3/**
+!www/mp3/.gitkeep

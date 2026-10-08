@@ -1,0 +1,73 @@
+/* Goum — design tokens (charte graphique)
+   Source of truth documented at /chart/
+   Import this file on every new page. */
+
+@import url("https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+:root {
+  /* Brand */
+  --goum-ink: #0c0b0a;
+  --goum-asphalt: #161412;
+  --goum-smoke: #2a2622;
+  --goum-paper: #f2ebe3;
+  --goum-mute: #a89f94;
+  --goum-signal: #e11d2e;
+  --goum-signal-hot: #ff3b4a;
+  --goum-amber: #e8a317;
+
+  /* Surfaces */
+  --color-bg: var(--goum-ink);
+  --color-bg-elevated: var(--goum-asphalt);
+  --color-bg-panel: var(--goum-smoke);
+  --color-text: var(--goum-paper);
+  --color-text-muted: var(--goum-mute);
+  --color-accent: var(--goum-signal);
+  --color-accent-hover: var(--goum-signal-hot);
+  --color-highlight: var(--goum-amber);
+  --color-border: rgba(242, 235, 227, 0.12);
+  --color-border-strong: rgba(242, 235, 227, 0.28);
+
+  /* Typography */
+  --font-display: "Syne", sans-serif;
+  --font-body: "IBM Plex Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --text-xs: clamp(0.75rem, 0.7rem + 0.2vw, 0.8125rem);
+  --text-sm: clamp(0.875rem, 0.82rem + 0.25vw, 0.9375rem);
+  --text-md: clamp(1rem, 0.95rem + 0.3vw, 1.125rem);
+  --text-lg: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
+  --text-xl: clamp(1.75rem, 1.3rem + 1.4vw, 2.5rem);
+  --text-hero: clamp(3.5rem, 2rem + 8vw, 9rem);
+
+  --leading-tight: 1.05;
+  --leading-snug: 1.25;
+  --leading-normal: 1.55;
+
+  --tracking-brand: -0.04em;
+  --tracking-wide: 0.08em;
+
+  /* Space */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4.5rem;
+  --space-9: 7rem;
+
+  --page-pad: clamp(1.25rem, 4vw, 3rem);
+  --content-max: 72rem;
+  --measure: 38rem;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 160ms;
+  --duration: 420ms;
+  --duration-slow: 900ms;
+
+  /* Radii / lines — keep sharp: no soft product UI */
+  --radius: 0;
+  --hairline: 1px;
+}

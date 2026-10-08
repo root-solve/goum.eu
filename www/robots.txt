@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Allow: /assets/
+Allow: /mp3/
+
+Disallow: /api/
+Disallow: /chart/
+
+Sitemap: https://goum.eu/sitemap.xml

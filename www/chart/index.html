@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Charte graphique — Goum</title>
+	<meta name="description" content="Charte graphique Goum : couleurs, typographies, composants et tokens CSS.">
+	<meta name="robots" content="noindex, nofollow">
+	<link rel="canonical" href="https://goum.eu/">
+	<link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
+	<link rel="icon" type="image/png" href="/assets/favicon.png">
+	<link rel="stylesheet" href="/assets/css/chart.css">
+</head>
+<body>
+	<main class="chart">
+		<nav class="chart-nav" aria-label="Navigation">
+			<a href="/">← Goum</a>
+		</nav>
+
+		<header class="chart-hero">
+			<h1>Charte</h1>
+			<p>
+				Identité visuelle du site remade : asphalt, signal rouge, typo display Syne.
+				Pas d’images décoratives — texte, musique, favicon.
+			</p>
+			<ul class="chart-toc">
+				<li><a href="#couleurs">Couleurs</a></li>
+				<li><a href="#typo">Typo</a></li>
+				<li><a href="#espace">Espace</a></li>
+				<li><a href="#composants">Composants</a></li>
+				<li><a href="#tokens">Tokens</a></li>
+			</ul>
+		</header>
+
+		<section class="chart-section" id="couleurs">
+			<h2>Couleurs</h2>
+			<p>Palette sombre de scène, accent signal pour les titres de morceaux et les CTA.</p>
+			<div class="swatch-grid">
+				<div class="swatch">
+					<div class="swatch-chip" style="background:#0c0b0a"></div>
+					<div class="swatch-meta"><strong>Ink</strong><code>--goum-ink</code></div>
+				</div>
+				<div class="swatch">
+					<div class="swatch-chip" style="background:#161412"></div>
+					<div class="swatch-meta"><strong>Asphalt</strong><code>--goum-asphalt</code></div>
+				</div>
+				<div class="swatch">
+					<div class="swatch-chip" style="background:#2a2622"></div>
+					<div class="swatch-meta"><strong>Smoke</strong><code>--goum-smoke</code></div>
+				</div>
+				<div class="swatch">
+					<div class="swatch-chip" style="background:#f2ebe3"></div>
+					<div class="swatch-meta"><strong>Paper</strong><code>--goum-paper</code></div>
+				</div>
+				<div class="swatch">
+					<div class="swatch-chip" style="background:#a89f94"></div>
+					<div class="swatch-meta"><strong>Mute</strong><code>--goum-mute</code></div>
+				</div>
+				<div class="swatch">
+					<div class="swatch-chip" style="background:#e11d2e"></div>
+					<div class="swatch-meta"><strong>Signal</strong><code>--goum-signal</code></div>
+				</div>
+				<div class="swatch">
+					<div class="swatch-chip" style="background:#ff3b4a"></div>
+					<div class="swatch-meta"><strong>Signal hot</strong><code>--goum-signal-hot</code></div>
+				</div>
+				<div class="swatch">
+					<div class="swatch-chip" style="background:#e8a317"></div>
+					<div class="swatch-meta"><strong>Amber</strong><code>--goum-amber</code></div>
+				</div>
+			</div>
+		</section>
+
+		<section class="chart-section" id="typo">
+			<h2>Typographie</h2>
+			<p>Syne pour la marque et les titres. IBM Plex Sans pour le corps. IBM Plex Mono pour métadonnées et UI.</p>
+			<div class="type-specimen">
+				<div class="type-row">
+					<p class="label">Display · Syne 800 · --text-hero</p>
+					<p class="type-display">Goum</p>
+				</div>
+				<div class="type-row">
+					<p class="label">Title · Syne 700 · --text-xl</p>
+					<p class="type-title">72 mélodies</p>
+				</div>
+				<div class="type-row">
+					<p class="label">Body · IBM Plex Sans · --text-md</p>
+					<p class="type-body">Nous répétons depuis 2008 tous les samedis à Bondy dans le 93.</p>
+				</div>
+				<div class="type-row">
+					<p class="label">Mono · IBM Plex Mono · track meta</p>
+					<p class="type-mono">2026 — 72 — le Coup de fil de Dominguez — mix 1 — 4.09</p>
+				</div>
+			</div>
+		</section>
+
+		<section class="chart-section" id="espace">
+			<h2>Espace</h2>
+			<p>Échelle --space-1 … --space-9. Padding de page fluide via --page-pad.</p>
+			<div class="space-ladder">
+				<div class="space-step"><span>space-2</span><div class="space-bar" style="width:0.5rem"></div></div>
+				<div class="space-step"><span>space-4</span><div class="space-bar" style="width:1rem"></div></div>
+				<div class="space-step"><span>space-5</span><div class="space-bar" style="width:1.5rem"></div></div>
+				<div class="space-step"><span>space-6</span><div class="space-bar" style="width:2rem"></div></div>
+				<div class="space-step"><span>space-7</span><div class="space-bar" style="width:3rem"></div></div>
+				<div class="space-step"><span>space-8</span><div class="space-bar" style="width:4.5rem"></div></div>
+			</div>
+		</section>
+
+		<section class="chart-section" id="composants">
+			<h2>Composants</h2>
+			<p>Boutons + lecteur playlist (tokens chart). Le catalogue vient de <code>/api/tracks</code> (scan live de <code>www/mp3/</code>).</p>
+			<div class="component-row">
+				<a class="btn btn-primary" href="/#ecoute">Écouter</a>
+				<a class="btn btn-ghost" href="/#equipe">Rejoindre</a>
+			</div>
+			<div class="component-row">
+				<button type="button" class="btn btn-primary" disabled>Play</button>
+				<button type="button" class="btn btn-ghost" disabled>Prev</button>
+				<button type="button" class="btn btn-ghost" disabled>Next</button>
+			</div>
+			<div class="demo-track">
+				<i>Titre courant · meta mono signal · barre --goum-signal</i>
+				<div style="height:0.35rem;background:var(--color-bg-panel);border:1px solid var(--color-border);margin-top:0.75rem">
+					<div style="width:42%;height:100%;background:var(--color-accent)"></div>
+				</div>
+			</div>
+			<p style="margin-top:1.5rem;color:var(--color-text-muted)">
+				Assets&nbsp;: <code>/assets/css/player.css</code> · <code>/assets/js/player.js</code><br>
+				Convention fichier&nbsp;: <code>NN-YYYY-Titre-mix_N.mp3</code> (underscores OK).
+			</p>
+		</section>
+
+		<section class="chart-section" id="tokens">
+			<h2>Tokens</h2>
+			<p>Fichier unique à importer sur chaque page du nouveau site :</p>
+			<div class="token-path">
+				<code>&lt;link rel="stylesheet" href="/assets/css/tokens.css"&gt;</code><br>
+				<code>/* ou via */ @import url("./tokens.css");</code>
+			</div>
+			<p style="margin-top:1.5rem;color:var(--color-text-muted)">
+				<code>main.css</code> (accueil) et <code>chart.css</code> (cette page) consomment les mêmes variables.
+				Images autorisées&nbsp;: favicon + fond de scène <code>/assets/images/stage-bg.jpg</code>
+				(banner regradé ink/signal). Durées mp3 via <code>/api/tracks</code> (<code>duration</code> / <code>duration_label</code>).
+			</p>
+		</section>
+	</main>
+</body>
+</html>
