@@ -47,7 +47,8 @@ Public = **Apache** (TLS + proxy). Le conteneur écoute seulement en `127.0.0.1`
 
 Certificat seul : `make certbot`. Le vhost ne touche pas aux autres sites Apache.
 
-Dépannage 403 : `make perms && make restart` ; tester `curl -sI http://127.0.0.1:8090/` puis le domaine via Apache.
+Dépannage 403 : `make doctor` (perms + backend + présence de `ProxyPass` dans le vhost SSL Apache).  
+`sudo make deploy` est OK : Docker tourne quand même sous l’utilisateur réel (`SUDO_USER`), pas root.
 
 ## Arborescence
 

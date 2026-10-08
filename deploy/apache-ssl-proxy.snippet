@@ -1,0 +1,13 @@
+  # Reverse-proxy to Docker (injected by install-host-apache.sh — do not remove)
+  ProxyPreserveHost On
+  ProxyRequests Off
+  RequestHeader set X-Forwarded-Proto "https"
+  RequestHeader set X-Forwarded-Port "443"
+  RequestHeader set X-Real-IP %{REMOTE_ADDR}s
+
+  ProxyPass / http://127.0.0.1:__HTTP_PORT__/
+  ProxyPassReverse / http://127.0.0.1:__HTTP_PORT__/
+  ProxyPassReverse / http://__DOMAIN__/
+  ProxyPassReverse / https://__DOMAIN__/
+  ProxyPassReverse / http://www.__DOMAIN__/
+  ProxyPassReverse / https://www.__DOMAIN__/

@@ -175,15 +175,61 @@ mv "${TMP}.mode" "$TMP"
 
 install -m 0644 "$TMP" "$DEST"
 
-# Keep THIS domain's Certbot SSL proxy pointed at the Docker port (no other sites).
-if [[ -f "$SSL_DEST" ]]; then
-  if grep -q 'SSLEngine on' "$SSL_DEST" && grep -q 'ProxyPass' "$SSL_DEST"; then
-    sed -i -E "s#http://127\\.0\\.0\\.1:[0-9]+/#http://127.0.0.1:${HTTP_PORT}/#g" "$SSL_DEST"
+# Certbot SSL vhost: must proxy to Docker. After HTTP is switched to
+# "redirect only", Certbot can regenerate le-ssl without ProxyPass → Apache 403.
+SSL_SNIPPET="$ROOT/deploy/apache-ssl-proxy.snippet"
+ensure_ssl_proxy() {
+  local dest="$1"
+  [[ -f "$dest" ]] || return 0
+  grep -q 'SSLEngine on' "$dest" || return 0
+
+  if grep -q 'ProxyPass' "$dest"; then
+    sed -i -E "s#http://127\\.0\\.0\\.1:[0-9]+/#http://127.0.0.1:${HTTP_PORT}/#g" "$dest"
+  else
+    if [[ ! -f "$SSL_SNIPPET" ]]; then
+      echo "Missing SSL proxy snippet: $SSL_SNIPPET" >&2
+      exit 1
+    fi
+    echo "Injecting ProxyPass → 127.0.0.1:${HTTP_PORT} into $(basename "$dest")…"
+    local blockf
+    blockf="$(mktemp)"
+    sed \
+      -e "s/__HTTP_PORT__/${HTTP_PORT}/g" \
+      -e "s/__DOMAIN__/${DOMAIN}/g" \
+      "$SSL_SNIPPET" > "$blockf"
+    awk -v blockfile="$blockf" '
+      /<\/VirtualHost>/ && !done {
+        while ((getline line < blockfile) > 0) print line
+        close(blockfile)
+        done=1
+      }
+      { print }
+    ' "$dest" > "${dest}.tmp"
+    rm -f "$blockf"
+    mv "${dest}.tmp" "$dest"
   fi
+
+  # HTTPS must advertise https to the app (not leftover "http" from bootstrap copy).
+  sed -i 's/RequestHeader set X-Forwarded-Proto "http"/RequestHeader set X-Forwarded-Proto "https"/g' "$dest"
+  if ! grep -q 'X-Forwarded-Proto' "$dest"; then
+    sed -i '/ProxyPreserveHost/a\  RequestHeader set X-Forwarded-Proto "https"\n  RequestHeader set X-Forwarded-Port "443"' "$dest"
+  fi
+  if ! grep -q 'X-Real-IP' "$dest"; then
+    sed -i '/X-Forwarded-Proto/a\  RequestHeader set X-Real-IP %{REMOTE_ADDR}s' "$dest"
+  fi
+}
+
+ensure_ssl_proxy "$SSL_DEST"
+# Also fix enabled symlink target if different path
+if [[ -L "${SITE_ENABLED}/${DOMAIN}-le-ssl.conf" ]]; then
+  ensure_ssl_proxy "$(readlink -f "${SITE_ENABLED}/${DOMAIN}-le-ssl.conf")"
 fi
 
 # Enable only this site — do not a2dissite other vhosts.
 a2ensite "$SITE_FILE" >/dev/null
+if [[ -f "$SSL_DEST" ]]; then
+  a2ensite "${DOMAIN}-le-ssl.conf" >/dev/null 2>&1 || true
+fi
 
 apache2ctl configtest
 systemctl enable apache2 >/dev/null
@@ -193,7 +239,11 @@ echo ""
 echo "Host vhost installed (other sites untouched):"
 echo "  domain:     ${DOMAIN} (www.${DOMAIN})"
 echo "  http :80:   ${HTTP_MODE}"
-echo "  https proxy: ${DOMAIN}-le-ssl.conf → http://127.0.0.1:${HTTP_PORT}/"
+if [[ -f "$SSL_DEST" ]]; then
+  echo "  https:      ${DOMAIN}-le-ssl.conf → http://127.0.0.1:${HTTP_PORT}/"
+else
+  echo "  https:      (no ${DOMAIN}-le-ssl.conf yet — run make certbot)"
+fi
 echo "  site file:  ${DEST}"
 echo "  http2:      conf-available/http2.conf"
 echo "  proxy tls:  conf-available/${PROXY_TLS_NAME}.conf"
