@@ -12,8 +12,10 @@ SITE_URL := $(or $(call env_val,SITE_URL),https://$(DOMAIN))
 ENDPOINT := http://localhost:$(HTTP_PORT)
 PROJECT_OWNER := $(or $(call env_val,PROJECT_OWNER),goum)
 
-# If `sudo make deploy`, run Docker as the real user (not root).
-COMPOSE_USER := $(if $(SUDO_USER),$(SUDO_USER),$(shell id -un))
+ROOT := $(abspath .)
+ENV_ABS := $(abspath $(ENV_FILE))
+COMPOSE_FILE := $(ROOT)/docker-compose.yml
+OWNER_HOME := $(shell getent passwd $(PROJECT_OWNER) | cut -d: -f6)
 
 .PHONY: build rebuild start restart stop logs perms deploy certbot apache-check doctor
 
@@ -39,8 +41,7 @@ restart:
 
 ## Ownership (PROJECT_OWNER) + path traversal so the container behind Apache can read www/
 perms:
-	@chmod +x deploy/fix-perms.sh
-	ENV_FILE="$(abspath $(ENV_FILE))" ./deploy/fix-perms.sh
+	@bash deploy/fix-perms.sh
 
 stop:
 	$(COMPOSE) down
@@ -51,19 +52,16 @@ logs:
 apache-check:
 	@echo "Domain:  $(DOMAIN)  ($(SITE_URL))"
 	@echo "Port:    $(HTTP_PORT)  bind=$(HTTP_BIND)"
-	@echo "Owner:   $(PROJECT_OWNER)"
-	@echo "1) As $(PROJECT_OWNER): git pull && make deploy"
-	@echo "   (or: sudo make deploy — Docker still runs as $(COMPOSE_USER))"
-	@echo "2) make doctor  # if Forbidden / 403"
+	@echo "Owner:   $(PROJECT_OWNER)  (must be in group docker)"
+	@echo "Deploy:  make deploy  |  sudo make deploy"
+	@echo "Doctor:  make doctor"
 
 ## Quick diagnosis: perms + backend + Apache
 doctor:
-	@chmod +x deploy/fix-perms.sh
-	@echo "== perms =="
-	ENV_FILE="$(abspath $(ENV_FILE))" ./deploy/fix-perms.sh
+	@bash deploy/fix-perms.sh
 	@echo ""
-	@echo "== home traverse (need ---x--x or better on other) =="
-	@namei -l "$(abspath .)/www/index.html" 2>/dev/null || ls -ld /home /home/* "$(abspath .)" www 2>/dev/null || true
+	@echo "== path to index (other needs --x on each dir) =="
+	@namei -l "$(ROOT)/www/index.html" 2>/dev/null || true
 	@echo ""
 	@echo "== backend (what Apache proxies to) =="
 	@curl -sS -o /dev/null -w "http://127.0.0.1:$(HTTP_PORT)/ → HTTP %{http_code}\n" "http://127.0.0.1:$(HTTP_PORT)/" || echo "backend unreachable"
@@ -78,31 +76,48 @@ doctor:
 	@echo "== public =="
 	@curl -sS -o /dev/null -w "https://$(DOMAIN)/ → HTTP %{http_code}\n" "https://$(DOMAIN)/" || true
 
-## Deploy: perms + container on loopback + Apache vhost + optional certbot
+## Deploy: perms + containers as PROJECT_OWNER + Apache (root) + optional certbot
 deploy:
-	@chmod +x deploy/install-host-apache.sh deploy/certbot-https.sh deploy/fix-perms.sh
-	@test -f "$(ENV_FILE)" || (echo "Missing $(ENV_FILE). Copy .env.example → .env." >&2; exit 1)
-	@$(MAKE) perms
-	@echo "Starting containers on 127.0.0.1:$(HTTP_PORT) as user $(COMPOSE_USER)…"
+	@test -f "$(ENV_ABS)" || (echo "Missing $(ENV_ABS). Copy .env.example → .env." >&2; exit 1)
+	@id -u "$(PROJECT_OWNER)" >/dev/null 2>&1 || (echo "PROJECT_OWNER=$(PROJECT_OWNER) does not exist" >&2; exit 1)
+	@bash deploy/fix-perms.sh
+	@echo "Ensure $(PROJECT_OWNER) is in group docker…"
 	@if [ "$$(id -u)" -eq 0 ]; then \
-		runuser -u "$(COMPOSE_USER)" -- env HTTP_BIND=127.0.0.1 HTTP_PORT="$(HTTP_PORT)" \
-			docker compose --env-file "$(abspath $(ENV_FILE))" \
-			-f "$(abspath .)/docker-compose.yml" up -d --build; \
+		id -nG "$(PROJECT_OWNER)" | grep -qw docker || usermod -aG docker "$(PROJECT_OWNER)"; \
 	else \
-		HTTP_BIND=127.0.0.1 HTTP_PORT=$(HTTP_PORT) $(COMPOSE) up -d --build; \
+		sudo bash -c 'id -nG "$(PROJECT_OWNER)" | grep -qw docker || usermod -aG docker "$(PROJECT_OWNER)"'; \
+	fi
+	@echo "Starting containers on 127.0.0.1:$(HTTP_PORT) as $(PROJECT_OWNER)…"
+	@if [ "$$(id -un)" = "$(PROJECT_OWNER)" ]; then \
+		HTTP_BIND=127.0.0.1 HTTP_PORT="$(HTTP_PORT)" \
+			docker compose --env-file "$(ENV_ABS)" -f "$(COMPOSE_FILE)" \
+			--project-directory "$(ROOT)" up -d --build; \
+	elif [ "$$(id -u)" -eq 0 ]; then \
+		runuser -u "$(PROJECT_OWNER)" -- env HOME="$(OWNER_HOME)" \
+			HTTP_BIND=127.0.0.1 HTTP_PORT="$(HTTP_PORT)" \
+			docker compose --env-file "$(ENV_ABS)" -f "$(COMPOSE_FILE)" \
+			--project-directory "$(ROOT)" up -d --build; \
+	else \
+		sudo runuser -u "$(PROJECT_OWNER)" -- env HOME="$(OWNER_HOME)" \
+			HTTP_BIND=127.0.0.1 HTTP_PORT="$(HTTP_PORT)" \
+			docker compose --env-file "$(ENV_ABS)" -f "$(COMPOSE_FILE)" \
+			--project-directory "$(ROOT)" up -d --build; \
 	fi
 	@if [ "$$(id -u)" -eq 0 ]; then \
-		ENV_FILE="$(abspath $(ENV_FILE))" ./deploy/install-host-apache.sh; \
+		ENV_FILE="$(ENV_ABS)" bash deploy/install-host-apache.sh; \
 	else \
-		sudo ENV_FILE="$(abspath $(ENV_FILE))" ./deploy/install-host-apache.sh; \
+		sudo ENV_FILE="$(ENV_ABS)" bash deploy/install-host-apache.sh; \
 	fi
-	@if grep -qE '^CONTACT_MAIL=.+@' "$(ENV_FILE)"; then \
+	@has_mail=0; \
+	if [ "$$(id -u)" -eq 0 ]; then \
+		grep -qE '^CONTACT_MAIL=.+@' "$(ENV_ABS)" && has_mail=1 || true; \
+	else \
+		sudo grep -qE '^CONTACT_MAIL=.+@' "$(ENV_ABS)" && has_mail=1 || true; \
+	fi; \
+	if [ "$$has_mail" -eq 1 ]; then \
 		echo "CONTACT_MAIL set — running certbot…"; \
-		if [ "$$(id -u)" -eq 0 ]; then \
-			ENV_FILE="$(abspath $(ENV_FILE))" ./deploy/certbot-https.sh; \
-		else \
-			sudo ENV_FILE="$(abspath $(ENV_FILE))" ./deploy/certbot-https.sh; \
-		fi; \
+		if [ "$$(id -u)" -eq 0 ]; then ENV_FILE="$(ENV_ABS)" bash deploy/certbot-https.sh; \
+		else sudo ENV_FILE="$(ENV_ABS)" bash deploy/certbot-https.sh; fi; \
 	else \
 		echo "Skip certbot (set CONTACT_MAIL in .env, then: make certbot)"; \
 	fi
@@ -113,10 +128,9 @@ deploy:
 
 ## Let's Encrypt HTTPS + renew timer (this domain only)
 certbot:
-	@chmod +x deploy/certbot-https.sh
-	@test -f "$(ENV_FILE)" || (echo "Missing $(ENV_FILE). Copy .env.example → .env." >&2; exit 1)
+	@test -f "$(ENV_ABS)" || (echo "Missing $(ENV_ABS). Copy .env.example → .env." >&2; exit 1)
 	@if [ "$$(id -u)" -eq 0 ]; then \
-		ENV_FILE="$(abspath $(ENV_FILE))" ./deploy/certbot-https.sh; \
+		ENV_FILE="$(ENV_ABS)" bash deploy/certbot-https.sh; \
 	else \
-		sudo ENV_FILE="$(abspath $(ENV_FILE))" ./deploy/certbot-https.sh; \
+		sudo ENV_FILE="$(ENV_ABS)" bash deploy/certbot-https.sh; \
 	fi

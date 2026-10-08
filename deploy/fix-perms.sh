@@ -94,4 +94,4 @@ if [[ "$(id -u)" -eq 0 ]]; then
 fi
 
 echo "OK — www is world-readable; parents are traversable (o+x); owned by ${OWNER}."
-echo "If the site still 403s: curl -sI http://127.0.0.1:\${HTTP_PORT:-8090}/  and  docker compose logs web"
+echo "If the site still 403s: make doctor"
