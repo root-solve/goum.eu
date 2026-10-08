@@ -35,7 +35,7 @@ restart:
 
 ## Make www readable by nginx (needed after adding mp3s with tight umask)
 perms:
-	chmod -R a+rX www/mp3 www/assets www/chart www/index.html
+	chmod -R a+rX www/mp3 www/assets www/chart www/index.html www/robots.txt www/sitemap.xml
 
 stop:
 	$(COMPOSE) down
