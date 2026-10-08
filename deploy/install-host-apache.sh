@@ -88,7 +88,7 @@ fi
 a2enmod proxy proxy_http headers rewrite ssl http2 >/dev/null
 
 # Normalize forwarded headers on THIS domain's Certbot SSL vhost only.
-fix_SSL_PROTO=0
+FIX_SSL_PROTO=0
 for f in "$SSL_DEST" "${SITE_ENABLED}/${DOMAIN}-le-ssl.conf"; do
   [[ -f "$f" || -L "$f" ]] || continue
   target="$f"
@@ -116,7 +116,7 @@ for f in "$SSL_DEST" "${SITE_ENABLED}/${DOMAIN}-le-ssl.conf"; do
     FIX_SSL_PROTO=1
   fi
 done
-if [[ "$FIX_SSL_PROTO" -eq 1 ]]; then
+if [[ "${FIX_SSL_PROTO:-0}" -eq 1 ]]; then
   echo "Normalized X-Forwarded-Proto=https on ${DOMAIN} SSL vhost."
 fi
 
