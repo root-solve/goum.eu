@@ -33,9 +33,10 @@ restart:
 	$(COMPOSE) up -d --build --force-recreate --remove-orphans
 	@echo "$(ENDPOINT)"
 
-## Make www readable by nginx (needed after adding mp3s with tight umask)
+## Ownership (PROJECT_OWNER) + path traversal so the container behind Apache can read www/
 perms:
-	chmod -R a+rX www/mp3 www/assets www/chart www/index.html www/robots.txt www/sitemap.xml
+	@chmod +x deploy/fix-perms.sh
+	ENV_FILE="$(abspath $(ENV_FILE))" ./deploy/fix-perms.sh
 
 stop:
 	$(COMPOSE) down
@@ -50,10 +51,11 @@ apache-check:
 	@echo "2) make deploy"
 	@echo "3) make certbot  # if CONTACT_MAIL was empty on deploy"
 
-## Deploy: container on loopback + Apache vhost → container + optional certbot
+## Deploy: perms + container on loopback + Apache vhost + optional certbot
 deploy:
-	@chmod +x deploy/install-host-apache.sh deploy/certbot-https.sh
+	@chmod +x deploy/install-host-apache.sh deploy/certbot-https.sh deploy/fix-perms.sh
 	@test -f "$(ENV_FILE)" || (echo "Missing $(ENV_FILE). Copy .env.example → .env." >&2; exit 1)
+	@$(MAKE) perms
 	@echo "Starting containers on 127.0.0.1:$(HTTP_PORT) (Apache will proxy)…"
 	HTTP_BIND=127.0.0.1 HTTP_PORT=$(HTTP_PORT) $(COMPOSE) up -d --build
 	sudo ENV_FILE="$(abspath $(ENV_FILE))" ./deploy/install-host-apache.sh

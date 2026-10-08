@@ -14,7 +14,7 @@ Site de **Goum** — groupe de Bondy (93) depuis 2008. Playlist live, page « Re
 ```bash
 cp .env.example .env   # ajuster CONTACT_*, YOUTUBE_URL, etc.
 # déposer les mp3 dans www/mp3/
-make perms             # si nginx renvoie 403
+make perms             # ownership + lecture du conteneur (si 403)
 make start             # → http://localhost:8090
 ```
 
@@ -24,6 +24,7 @@ Commandes utiles : `make restart` (recree avec le `.env`), `make stop`, `make lo
 
 | Variable | Rôle |
 |----------|------|
+| `PROJECT_OWNER` | User hôte qui édite le projet (`goum` en prod) |
 | `DOMAIN` / `SITE_URL` | Domaine public |
 | `HTTP_PORT` / `HTTP_BIND` | Port Docker (8090) / bind local |
 | `CONTACT_MAIL` / `CONTACT_PHONE` | Affichés sur le site + mail Certbot |
@@ -37,11 +38,16 @@ Les mp3 **ne sont pas versionnés** (`www/mp3/` + `.gitkeep`).
 Sur le serveur (DNS `goum.eu` / `www` prêts, ports 80/443 ouverts) :
 
 ```bash
-# repo + .env + fichiers www/mp3/
-make deploy            # conteneur en 127.0.0.1 + vhost Apache + Certbot
+# repo sous /home/goum/… + .env (PROJECT_OWNER=goum) + www/mp3/
+make deploy            # perms + conteneur 127.0.0.1 + Apache + Certbot
 ```
 
+Public = **Apache** (TLS + proxy). Le conteneur écoute seulement en `127.0.0.1`.  
+`make deploy` / `make perms` : propriétaire `goum`, `www/` lisible, **o+x** sur `/home/goum` (sinon Apache reçoit un **403** du backend).
+
 Certificat seul : `make certbot`. Le vhost ne touche pas aux autres sites Apache.
+
+Dépannage 403 : `make perms && make restart` ; tester `curl -sI http://127.0.0.1:8090/` puis le domaine via Apache.
 
 ## Arborescence
 
