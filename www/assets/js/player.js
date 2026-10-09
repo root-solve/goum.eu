@@ -20,6 +20,8 @@
     status: STAGE.querySelector("[data-player-status]"),
     empty: STAGE.querySelector("[data-player-empty]"),
     audio: STAGE.querySelector("audio"),
+    eq: STAGE.querySelector("[data-eq]"),
+    eqCanvas: STAGE.querySelector("[data-eq-canvas]"),
   };
 
   const state = {
@@ -28,6 +30,15 @@
     index: 0,
     query: "",
     seeking: false,
+  };
+
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const eq = {
+    ctx: null,
+    analyser: null,
+    source: null,
+    raf: 0,
+    peaks: null,
   };
 
   const normalize = (value) =>
@@ -163,6 +174,120 @@
     if (!els.play) return;
     els.play.setAttribute("aria-pressed", playing ? "true" : "false");
     els.play.textContent = playing ? "Pause" : "Play";
+    els.eq?.classList.toggle("is-idle", !playing);
+    if (playing) startEq();
+    else {
+      stopEqDraw();
+      drawEqIdle();
+    }
+  };
+
+  const ensureEq = () => {
+    if (reduceMotion || !els.eqCanvas || !els.audio) return false;
+    if (eq.analyser) return true;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return false;
+    try {
+      eq.ctx = new AC();
+      eq.source = eq.ctx.createMediaElementSource(els.audio);
+      eq.analyser = eq.ctx.createAnalyser();
+      eq.analyser.fftSize = 256;
+      eq.analyser.smoothingTimeConstant = 0.72;
+      eq.source.connect(eq.analyser);
+      eq.analyser.connect(eq.ctx.destination);
+      return true;
+    } catch (err) {
+      console.warn("EQ unavailable", err);
+      return false;
+    }
+  };
+
+  const stopEqDraw = () => {
+    if (eq.raf) {
+      cancelAnimationFrame(eq.raf);
+      eq.raf = 0;
+    }
+  };
+
+  const drawEqIdle = () => {
+    const canvas = els.eqCanvas;
+    if (!canvas) return;
+    const c = canvas.getContext("2d");
+    if (!c) return;
+    const w = canvas.width;
+    const h = canvas.height;
+    c.clearRect(0, 0, w, h);
+    const bars = 28;
+    const gap = 2;
+    const bw = (w - gap * (bars - 1)) / bars;
+    for (let i = 0; i < bars; i++) {
+      const bh = 2 + ((i * 7) % 5);
+      c.fillStyle = "rgba(168, 159, 148, 0.35)";
+      c.fillRect(i * (bw + gap), h - bh, bw, bh);
+    }
+  };
+
+  const drawEqFrame = () => {
+    const canvas = els.eqCanvas;
+    if (!canvas || !eq.analyser) return;
+    const c = canvas.getContext("2d");
+    if (!c) return;
+
+    const bins = eq.analyser.frequencyBinCount;
+    const data = new Uint8Array(bins);
+    eq.analyser.getByteFrequencyData(data);
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const bars = 28;
+    const gap = 2;
+    const bw = (w - gap * (bars - 1)) / bars;
+    if (!eq.peaks || eq.peaks.length !== bars) {
+      eq.peaks = new Float32Array(bars);
+    }
+
+    c.clearRect(0, 0, w, h);
+
+    for (let i = 0; i < bars; i++) {
+      // Bias toward audible mids (skip deepest bass / extreme top)
+      const start = Math.floor(2 + (i / bars) * (bins * 0.55));
+      const end = Math.floor(start + bins / bars / 2) || start + 1;
+      let sum = 0;
+      for (let j = start; j < end && j < bins; j++) sum += data[j];
+      const avg = sum / Math.max(1, end - start);
+      const level = Math.pow(avg / 255, 1.15);
+      const bh = Math.max(2, level * h);
+
+      if (bh >= eq.peaks[i]) eq.peaks[i] = bh;
+      else eq.peaks[i] = Math.max(0, eq.peaks[i] - 0.55);
+
+      const x = i * (bw + gap);
+      const grad = c.createLinearGradient(0, h, 0, h - bh);
+      grad.addColorStop(0, "#e11d2e");
+      grad.addColorStop(0.55, "#e8a317");
+      grad.addColorStop(1, "#f2ebe3");
+      c.fillStyle = grad;
+      c.fillRect(x, h - bh, bw, bh);
+
+      // Winamp-style peak cap
+      const peakY = h - eq.peaks[i];
+      c.fillStyle = "#f2ebe3";
+      c.fillRect(x, Math.max(0, peakY), bw, 1);
+    }
+
+    eq.raf = requestAnimationFrame(drawEqFrame);
+  };
+
+  const startEq = () => {
+    if (!ensureEq()) {
+      drawEqIdle();
+      return;
+    }
+    if (eq.ctx?.state === "suspended") {
+      eq.ctx.resume().catch(() => {});
+    }
+    stopEqDraw();
+    drawEqFrame();
   };
 
   const safeMediaUrl = (url) => {
@@ -325,6 +450,8 @@
   const init = async () => {
     bind();
     if (els.volume) els.audio.volume = Number(els.volume.value);
+    els.eq?.classList.add("is-idle");
+    drawEqIdle();
     setStatus("Chargement de la playlist…");
     try {
       const res = await fetch("/api/tracks", { cache: "no-store" });
