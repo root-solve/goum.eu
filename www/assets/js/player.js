@@ -6,6 +6,7 @@
     count: document.querySelectorAll("[data-track-count]"),
     title: STAGE.querySelector("[data-now-title]"),
     meta: STAGE.querySelector("[data-now-meta]"),
+    kicker: STAGE.querySelector("[data-now-kicker]"),
     play: STAGE.querySelector("[data-action='play']"),
     prev: STAGE.querySelector("[data-action='prev']"),
     next: STAGE.querySelector("[data-action='next']"),
@@ -174,6 +175,7 @@
     if (!els.play) return;
     els.play.setAttribute("aria-pressed", playing ? "true" : "false");
     els.play.textContent = playing ? "Pause" : "Play";
+    if (els.kicker) els.kicker.textContent = playing ? "Now playing" : "Paused";
     els.eq?.classList.toggle("is-idle", !playing);
     if (playing) startEq();
     else {
