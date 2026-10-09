@@ -99,6 +99,34 @@
 		<header class="site-header">
 			<nav class="site-nav" aria-label="Navigation principale">
 				<a class="brand-mark" href="/" aria-current="page">Goum</a>
+				<div class="nav-mini" data-mini-player>
+					<canvas class="nav-mini-eq" data-mini-eq width="64" height="28" aria-hidden="true"></canvas>
+					<div class="nav-mini-body">
+						<div class="nav-mini-row">
+							<button type="button" class="nav-mini-btn" data-mini-prev aria-label="Précédent">Prev</button>
+							<button type="button" class="nav-mini-btn nav-mini-play" data-mini-play aria-pressed="false">Play</button>
+							<button type="button" class="nav-mini-btn" data-mini-next aria-label="Suivant">Next</button>
+							<span class="nav-mini-title" data-mini-title>-</span>
+							<span class="nav-mini-time"><span data-mini-time-current>0:00</span></span>
+						</div>
+						<div
+							class="nav-mini-progress"
+							data-mini-progress
+							role="slider"
+							tabindex="0"
+							aria-label="Position"
+							aria-valuemin="0"
+							aria-valuemax="100"
+							aria-valuenow="0"
+						>
+							<div class="nav-mini-progress-fill" data-mini-progress-fill></div>
+						</div>
+					</div>
+					<label class="nav-mini-vol" title="Volume">
+						<span class="visually-hidden">Volume</span>
+						<input type="range" data-mini-volume min="0" max="1" step="0.01" value="0.9" aria-label="Volume">
+					</label>
+				</div>
 				<div class="nav-links">
 					<a href="#equipe" data-nav-swap>Équipe</a>
 					<a

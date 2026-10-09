@@ -23,6 +23,16 @@
     audio: STAGE.querySelector("audio"),
     eq: STAGE.querySelector("[data-eq]"),
     eqCanvas: STAGE.querySelector("[data-eq-canvas]"),
+    miniRoot: document.querySelector("[data-mini-player]"),
+    miniPlay: document.querySelector("[data-mini-play]"),
+    miniPrev: document.querySelector("[data-mini-prev]"),
+    miniNext: document.querySelector("[data-mini-next]"),
+    miniTitle: document.querySelector("[data-mini-title]"),
+    miniEq: document.querySelector("[data-mini-eq]"),
+    miniProgress: document.querySelector("[data-mini-progress]"),
+    miniFill: document.querySelector("[data-mini-progress-fill]"),
+    miniTime: document.querySelector("[data-mini-time-current]"),
+    miniVolume: document.querySelector("[data-mini-volume]"),
   };
 
   const state = {
@@ -31,6 +41,7 @@
     index: 0,
     query: "",
     seeking: false,
+    seekTarget: null,
   };
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -150,9 +161,11 @@
     if (!track) {
       if (els.title) els.title.textContent = "-";
       if (els.meta) els.meta.textContent = "";
+      if (els.miniTitle) els.miniTitle.textContent = "-";
       return;
     }
     if (els.title) els.title.textContent = track.title;
+    if (els.miniTitle) els.miniTitle.textContent = track.title;
     if (els.meta) {
       els.meta.innerHTML = metaLine(track)
         .split(" · ")
@@ -176,7 +189,12 @@
     els.play.setAttribute("aria-pressed", playing ? "true" : "false");
     els.play.textContent = playing ? "Pause" : "Play";
     if (els.kicker) els.kicker.textContent = playing ? "Now playing" : "Paused";
+    if (els.miniPlay) {
+      els.miniPlay.setAttribute("aria-pressed", playing ? "true" : "false");
+      els.miniPlay.textContent = playing ? "Pause" : "Play";
+    }
     els.eq?.classList.toggle("is-idle", !playing);
+    els.miniRoot?.classList.toggle("is-idle", !playing);
     if (playing) startEq();
     else {
       stopEqDraw();
@@ -185,7 +203,8 @@
   };
 
   const ensureEq = () => {
-    if (reduceMotion || !els.eqCanvas || !els.audio) return false;
+    if (reduceMotion || !els.audio) return false;
+    if (!els.eqCanvas && !els.miniEq) return false;
     if (eq.analyser) return true;
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return false;
@@ -211,57 +230,43 @@
     }
   };
 
-  const drawEqIdle = () => {
-    const canvas = els.eqCanvas;
+  const paintEq = (canvas, data, live) => {
     if (!canvas) return;
     const c = canvas.getContext("2d");
     if (!c) return;
     const w = canvas.width;
     const h = canvas.height;
-    c.clearRect(0, 0, w, h);
-    const bars = 28;
+    const bars = canvas === els.miniEq ? 12 : 28;
     const gap = 2;
     const bw = (w - gap * (bars - 1)) / bars;
-    for (let i = 0; i < bars; i++) {
-      const bh = 2 + ((i * 7) % 5);
-      c.fillStyle = "rgba(168, 159, 148, 0.35)";
-      c.fillRect(i * (bw + gap), h - bh, bw, bh);
+    const peakKey = canvas === els.miniEq ? "miniPeaks" : "peaks";
+    if (!eq[peakKey] || eq[peakKey].length !== bars) {
+      eq[peakKey] = new Float32Array(bars);
     }
-  };
-
-  const drawEqFrame = () => {
-    const canvas = els.eqCanvas;
-    if (!canvas || !eq.analyser) return;
-    const c = canvas.getContext("2d");
-    if (!c) return;
-
-    const bins = eq.analyser.frequencyBinCount;
-    const data = new Uint8Array(bins);
-    eq.analyser.getByteFrequencyData(data);
-
-    const w = canvas.width;
-    const h = canvas.height;
-    const bars = 28;
-    const gap = 2;
-    const bw = (w - gap * (bars - 1)) / bars;
-    if (!eq.peaks || eq.peaks.length !== bars) {
-      eq.peaks = new Float32Array(bars);
-    }
+    const peaks = eq[peakKey];
 
     c.clearRect(0, 0, w, h);
 
     for (let i = 0; i < bars; i++) {
-      // Bias toward audible mids (skip deepest bass / extreme top)
+      let bh;
+      if (!live || !data) {
+        bh = 2 + ((i * 7) % 5);
+        c.fillStyle = "rgba(168, 159, 148, 0.35)";
+        c.fillRect(i * (bw + gap), h - bh, bw, bh);
+        continue;
+      }
+
+      const bins = data.length;
       const start = Math.floor(2 + (i / bars) * (bins * 0.55));
       const end = Math.floor(start + bins / bars / 2) || start + 1;
       let sum = 0;
       for (let j = start; j < end && j < bins; j++) sum += data[j];
       const avg = sum / Math.max(1, end - start);
       const level = Math.pow(avg / 255, 1.15);
-      const bh = Math.max(2, level * h);
+      bh = Math.max(2, level * h);
 
-      if (bh >= eq.peaks[i]) eq.peaks[i] = bh;
-      else eq.peaks[i] = Math.max(0, eq.peaks[i] - 0.55);
+      if (bh >= peaks[i]) peaks[i] = bh;
+      else peaks[i] = Math.max(0, peaks[i] - 0.55);
 
       const x = i * (bw + gap);
       const grad = c.createLinearGradient(0, h, 0, h - bh);
@@ -270,13 +275,22 @@
       grad.addColorStop(1, "#f2ebe3");
       c.fillStyle = grad;
       c.fillRect(x, h - bh, bw, bh);
-
-      // Winamp-style peak cap
-      const peakY = h - eq.peaks[i];
       c.fillStyle = "#f2ebe3";
-      c.fillRect(x, Math.max(0, peakY), bw, 1);
+      c.fillRect(x, Math.max(0, h - peaks[i]), bw, 1);
     }
+  };
 
+  const drawEqIdle = () => {
+    paintEq(els.eqCanvas, null, false);
+    paintEq(els.miniEq, null, false);
+  };
+
+  const drawEqFrame = () => {
+    if (!eq.analyser) return;
+    const data = new Uint8Array(eq.analyser.frequencyBinCount);
+    eq.analyser.getByteFrequencyData(data);
+    paintEq(els.eqCanvas, data, true);
+    paintEq(els.miniEq, data, true);
     eq.raf = requestAnimationFrame(drawEqFrame);
   };
 
@@ -290,6 +304,22 @@
     }
     stopEqDraw();
     drawEqFrame();
+  };
+
+  const setVolume = (value) => {
+    const v = Math.min(1, Math.max(0, Number(value)));
+    els.audio.volume = v;
+    if (els.volume) els.volume.value = String(v);
+    if (els.miniVolume) els.miniVolume.value = String(v);
+  };
+
+  const setProgressUi = (ratio) => {
+    const pct = `${Math.min(100, Math.max(0, ratio * 100))}%`;
+    if (els.fill) els.fill.style.width = pct;
+    if (els.miniFill) els.miniFill.style.width = pct;
+    const now = Math.round(ratio * 100);
+    els.progress?.setAttribute("aria-valuenow", String(now));
+    els.miniProgress?.setAttribute("aria-valuenow", String(now));
   };
 
   const safeMediaUrl = (url) => {
@@ -370,70 +400,28 @@
     load(next, true);
   };
 
-  const seekFromEvent = (event) => {
+  const seekFromEvent = (event, progressEl) => {
+    if (!progressEl) return;
     if (!Number.isFinite(els.audio.duration) || els.audio.duration <= 0) return;
-    const rect = els.progress.getBoundingClientRect();
+    const rect = progressEl.getBoundingClientRect();
     const x =
       ("touches" in event ? event.touches[0].clientX : event.clientX) -
       rect.left;
     const ratio = Math.min(1, Math.max(0, x / rect.width));
     els.audio.currentTime = ratio * els.audio.duration;
-    els.fill.style.width = `${ratio * 100}%`;
+    setProgressUi(ratio);
   };
 
-  const bind = () => {
-    els.play?.addEventListener("click", toggle);
-    els.prev?.addEventListener("click", () => step(-1));
-    els.next?.addEventListener("click", () => step(1));
-    els.random?.addEventListener("click", randomTrack);
-
-    els.filter?.addEventListener("input", () => {
-      state.query = els.filter.value || "";
-      applyFilter();
-    });
-
-    els.audio.addEventListener("timeupdate", () => {
-      if (state.seeking) return;
-      const { currentTime, duration } = els.audio;
-      if (els.current) els.current.textContent = fmt(currentTime);
-      if (els.duration) els.duration.textContent = fmt(duration);
-      if (Number.isFinite(duration) && duration > 0) {
-        els.fill.style.width = `${(currentTime / duration) * 100}%`;
-      }
-    });
-
-    els.audio.addEventListener("ended", () => step(1));
-    els.audio.addEventListener("play", () => setPlayingUi(true));
-    els.audio.addEventListener("pause", () => setPlayingUi(false));
-    els.audio.addEventListener("error", () => {
-      setStatus("Impossible de lire ce fichier.");
-      setPlayingUi(false);
-    });
-
-    els.volume?.addEventListener("input", () => {
-      els.audio.volume = Number(els.volume.value);
-    });
-
+  const bindProgress = (progressEl) => {
+    if (!progressEl) return;
     const onDown = (event) => {
       state.seeking = true;
-      seekFromEvent(event);
+      state.seekTarget = progressEl;
+      seekFromEvent(event, progressEl);
     };
-    const onMove = (event) => {
-      if (!state.seeking) return;
-      seekFromEvent(event);
-    };
-    const onUp = () => {
-      state.seeking = false;
-    };
-
-    els.progress?.addEventListener("mousedown", onDown);
-    els.progress?.addEventListener("touchstart", onDown, { passive: true });
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("touchmove", onMove, { passive: true });
-    window.addEventListener("mouseup", onUp);
-    window.addEventListener("touchend", onUp);
-
-    els.progress?.addEventListener("keydown", (event) => {
+    progressEl.addEventListener("mousedown", onDown);
+    progressEl.addEventListener("touchstart", onDown, { passive: true });
+    progressEl.addEventListener("keydown", (event) => {
       if (!Number.isFinite(els.audio.duration)) return;
       const stepSec = event.shiftKey ? 10 : 5;
       if (event.key === "ArrowRight") {
@@ -449,10 +437,66 @@
     });
   };
 
+  const bind = () => {
+    els.play?.addEventListener("click", toggle);
+    els.prev?.addEventListener("click", () => step(-1));
+    els.next?.addEventListener("click", () => step(1));
+    els.random?.addEventListener("click", randomTrack);
+    els.miniPlay?.addEventListener("click", toggle);
+    els.miniPrev?.addEventListener("click", () => step(-1));
+    els.miniNext?.addEventListener("click", () => step(1));
+
+    els.filter?.addEventListener("input", () => {
+      state.query = els.filter.value || "";
+      applyFilter();
+    });
+
+    els.audio.addEventListener("timeupdate", () => {
+      if (state.seeking) return;
+      const { currentTime, duration } = els.audio;
+      if (els.current) els.current.textContent = fmt(currentTime);
+      if (els.duration) els.duration.textContent = fmt(duration);
+      if (els.miniTime) els.miniTime.textContent = fmt(currentTime);
+      if (Number.isFinite(duration) && duration > 0) {
+        setProgressUi(currentTime / duration);
+      }
+    });
+
+    els.audio.addEventListener("ended", () => step(1));
+    els.audio.addEventListener("play", () => setPlayingUi(true));
+    els.audio.addEventListener("pause", () => setPlayingUi(false));
+    els.audio.addEventListener("error", () => {
+      setStatus("Impossible de lire ce fichier.");
+      setPlayingUi(false);
+    });
+
+    els.volume?.addEventListener("input", () => setVolume(els.volume.value));
+    els.miniVolume?.addEventListener("input", () =>
+      setVolume(els.miniVolume.value)
+    );
+
+    bindProgress(els.progress);
+    bindProgress(els.miniProgress);
+
+    const onMove = (event) => {
+      if (!state.seeking || !state.seekTarget) return;
+      seekFromEvent(event, state.seekTarget);
+    };
+    const onUp = () => {
+      state.seeking = false;
+      state.seekTarget = null;
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("touchmove", onMove, { passive: true });
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchend", onUp);
+  };
+
   const init = async () => {
     bind();
-    if (els.volume) els.audio.volume = Number(els.volume.value);
+    setVolume(els.volume?.value ?? els.miniVolume?.value ?? 0.9);
     els.eq?.classList.add("is-idle");
+    els.miniRoot?.classList.add("is-idle");
     drawEqIdle();
     setStatus("Chargement de la playlist…");
     try {

@@ -32,6 +32,7 @@
     index = clamped;
     locked = true;
     deck.dataset.panel = String(index);
+    document.body.dataset.deckPanel = String(index);
     deck.style.setProperty("--deck-index", String(index));
     setSwap(index === 1);
 
@@ -166,4 +167,5 @@
   const bootHash = location.hash.replace("#", "");
   const boot = panels.findIndex((p) => p.id === bootHash);
   goTo(boot >= 0 ? boot : 0, true);
+  document.body.dataset.deckPanel = String(index);
 })();
