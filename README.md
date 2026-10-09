@@ -1,6 +1,9 @@
 # goum.eu
 
-Site de **Goum** — groupe de Bondy (93) depuis 2008. Playlist live, page « Rejoindre », charte graphique et déploiement Apache derrière Docker.
+Site de **Goum**, groupe de Bondy (93) depuis 2008. Playlist live, page « Rejoindre », charte graphique et déploiement Apache derrière Docker.
+
+- Site : [goum.eu](https://goum.eu)
+- Réalisé par [rootsolve.org](https://rootsolve.org)
 
 ## Stack
 
