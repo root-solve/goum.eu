@@ -27,14 +27,14 @@
     const youtube = safeHttpsUrl(data.youtube_url);
 
     if (phoneNode) {
-      phoneNode.textContent = phone || "—";
+      phoneNode.textContent = phone || "-";
       const tel = phone.replace(/[^\d+]/g, "");
       if (tel && tel.length >= 6) phoneNode.setAttribute("href", `tel:${tel}`);
       else phoneNode.removeAttribute("href");
     }
 
     if (mailNode) {
-      mailNode.textContent = mail || "—";
+      mailNode.textContent = mail || "-";
       if (mail) mailNode.setAttribute("href", `mailto:${encodeURIComponent(mail).replace(/%40/g, "@")}`);
       else mailNode.removeAttribute("href");
     }

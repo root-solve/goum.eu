@@ -113,7 +113,7 @@ def parse_filename(name: str) -> dict:
         "mix": mix,
         "retake": retake,
         "feat": feat,
-        "label": " — ".join(label_bits),
+        "label": " - ".join(label_bits),
         "file": name,
         "url": "/mp3/" + urllib.parse.quote(name),
     }
@@ -125,7 +125,7 @@ def build_track(path: Path) -> dict:
     track["duration"] = round(duration, 3) if duration is not None else None
     track["duration_label"] = format_duration(duration)
     if track["duration_label"]:
-        track["label"] = f"{track['label']} — {track['duration_label']}"
+        track["label"] = f"{track['label']} - {track['duration_label']}"
     return track
 
 

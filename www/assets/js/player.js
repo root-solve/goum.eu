@@ -122,10 +122,10 @@
         "playlist-item" + (index === state.index ? " is-active" : "");
       btn.setAttribute("data-index", String(index));
       btn.innerHTML = `
-        <span class="playlist-num">${track.num != null ? String(track.num).padStart(2, "0") : "—"}</span>
+        <span class="playlist-num">${track.num != null ? String(track.num).padStart(2, "0") : "-"}</span>
         <span class="playlist-title">${escapeHtml(track.title)}</span>
         <span class="playlist-year">${track.year != null ? track.year : ""}</span>
-        <span class="playlist-duration">${track.duration_label ? escapeHtml(track.duration_label) : "—"}</span>
+        <span class="playlist-duration">${track.duration_label ? escapeHtml(track.duration_label) : "-"}</span>
       `;
       btn.addEventListener("click", () => load(index, true));
       li.appendChild(btn);
@@ -136,7 +136,7 @@
   const syncNow = () => {
     const track = state.tracks[state.index];
     if (!track) {
-      if (els.title) els.title.textContent = "—";
+      if (els.title) els.title.textContent = "-";
       if (els.meta) els.meta.textContent = "";
       return;
     }
