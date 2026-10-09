@@ -115,19 +115,15 @@ else
   echo "Warning: certbot.timer not enabled. Add a cron job: certbot renew --quiet" >&2
 fi
 
-echo ""
-echo "Renew dry-run…"
-certbot renew --dry-run --cert-name "$DOMAIN"
-
 a2enmod http2 >/dev/null
 a2enconf http2 >/dev/null 2>&1 || true
 apache2ctl configtest >/dev/null
 systemctl reload apache2
 
 # Re-apply HTTP→HTTPS vhost for this domain only.
-if [[ -x "$ROOT/deploy/install-host-apache.sh" ]]; then
+if [[ -f "$ROOT/deploy/install-host-apache.sh" ]]; then
   echo "Refreshing host vhost (HTTP redirect + HSTS conf)…"
-  ENV_FILE="$ENV_FILE" "$ROOT/deploy/install-host-apache.sh"
+  ENV_FILE="$ENV_FILE" bash "$ROOT/deploy/install-host-apache.sh"
 fi
 
 echo ""
@@ -136,4 +132,11 @@ echo "HTTP check:  curl -sI http://${DOMAIN}/ | grep -iE '^(HTTP|Location|Strict
 echo "HTTPS check: curl -sI --http2 https://${DOMAIN}/ | grep -iE '^(HTTP|Strict)'"
 echo "Auto-renew:  systemctl status certbot.timer"
 echo "Manual renew: sudo certbot renew --cert-name ${DOMAIN}"
+echo ""
+
+# Optional check — LE rate limits must not fail deploy (cert already issued above).
+echo "Renew dry-run (optional)…"
+if ! certbot renew --dry-run --cert-name "$DOMAIN"; then
+  echo "Warning: renew dry-run failed (often Let's Encrypt busy/rate-limit). Cert itself is fine; timer will renew later." >&2
+fi
 echo ""
