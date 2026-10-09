@@ -50,9 +50,3 @@ www/           # site servi (monté live dans le conteneur)
 api/           # service /api/tracks et /api/site
 deploy/        # scripts Apache / Certbot
 ```
-
-## Sécurité (rappel prod)
-
-- `make deploy` publie le site en **127.0.0.1** seulement ; Apache termine le TLS.
-- L’API n’est **pas** exposée sur l’hôte (uniquement via le proxy `/api/`).
-- Ne pas committer `.env` ; mp3 hors git.
