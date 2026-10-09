@@ -29,7 +29,8 @@ Commandes : `make restart`, `make stop`, `make logs`.
 | `YOUTUBE_URL` | Lien YouTube dans le header (masqué si vide) |
 | `CERTBOT_STAGING` | `1` pour tests Let’s Encrypt |
 
-Les mp3 **ne sont pas versionnés** (`www/mp3/` + `.gitkeep`).
+Les mp3 **ne sont pas versionnés** (`www/mp3/` + `.gitkeep`).  
+Après ajout de fichiers en tant que `goum` : `chmod a+r www/mp3/*.mp3` (ou `make mp3-perms`) — sinon lecture **403** dans le player.
 
 ## Production
 

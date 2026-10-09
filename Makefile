@@ -10,7 +10,13 @@ HTTP_BIND := $(or $(call env_val,HTTP_BIND),0.0.0.0)
 SITE_URL := $(or $(call env_val,SITE_URL),https://$(DOMAIN))
 ENDPOINT := http://localhost:$(HTTP_PORT)
 
-.PHONY: build rebuild start restart stop logs deploy certbot
+.PHONY: build rebuild start restart stop logs deploy certbot mp3-perms
+
+## Make www/mp3 readable by the web container (run after adding files as goum)
+mp3-perms:
+	chmod a+rX www/mp3
+	chmod a+r www/mp3/*.mp3 2>/dev/null || true
+	@echo "OK — mp3s readable"
 
 build:
 	$(COMPOSE) build
