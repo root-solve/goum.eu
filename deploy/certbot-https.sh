@@ -98,15 +98,6 @@ fi
 echo "Requesting / refreshing certificate for ${DOMAIN} and www.${DOMAIN} only…"
 certbot "${CERTBOT_ARGS[@]}"
 
-# Point Certbot SSL vhost at this project's Docker port (scoped to this domain).
-SSL_DEST="/etc/apache2/sites-available/${DOMAIN}-le-ssl.conf"
-if [[ -f "$SSL_DEST" ]] && grep -q 'ProxyPass' "$SSL_DEST"; then
-  sed -i -E "s#http://127\\.0\\.0\\.1:[0-9]+/#http://127.0.0.1:${HTTP_PORT}/#g" "$SSL_DEST"
-  if grep -q 'X-Forwarded-Proto "http"' "$SSL_DEST"; then
-    sed -i 's/RequestHeader set X-Forwarded-Proto "http"/RequestHeader set X-Forwarded-Proto "https"/g' "$SSL_DEST"
-  fi
-fi
-
 # Ubuntu ships certbot.timer for twice-daily renew attempts (system-wide, safe).
 systemctl enable --now certbot.timer >/dev/null 2>&1 || true
 if systemctl is-enabled certbot.timer >/dev/null 2>&1; then
@@ -115,28 +106,12 @@ else
   echo "Warning: certbot.timer not enabled. Add a cron job: certbot renew --quiet" >&2
 fi
 
-a2enmod http2 >/dev/null
-a2enconf http2 >/dev/null 2>&1 || true
-apache2ctl configtest >/dev/null
-systemctl reload apache2
-
-# Re-apply HTTP→HTTPS vhost for this domain only.
-if [[ -f "$ROOT/deploy/install-host-apache.sh" ]]; then
-  echo "Refreshing host vhost (HTTP redirect + HSTS conf)…"
-  ENV_FILE="$ENV_FILE" bash "$ROOT/deploy/install-host-apache.sh"
-fi
+# Install our HTTPS proxy vhost (overwrites Certbot's often-broken copy).
+echo "Installing HTTPS reverse-proxy vhost…"
+ENV_FILE="$ENV_FILE" bash "$ROOT/deploy/install-host-apache.sh"
 
 echo ""
 echo "HTTPS ready: https://${DOMAIN}/"
-echo "HTTP check:  curl -sI http://${DOMAIN}/ | grep -iE '^(HTTP|Location|Strict)'"
-echo "HTTPS check: curl -sI --http2 https://${DOMAIN}/ | grep -iE '^(HTTP|Strict)'"
+echo "Check:  curl -sI https://${DOMAIN}/ | head -3"
 echo "Auto-renew:  systemctl status certbot.timer"
-echo "Manual renew: sudo certbot renew --cert-name ${DOMAIN}"
-echo ""
-
-# Optional check — LE rate limits must not fail deploy (cert already issued above).
-echo "Renew dry-run (optional)…"
-if ! certbot renew --dry-run --cert-name "$DOMAIN"; then
-  echo "Warning: renew dry-run failed (often Let's Encrypt busy/rate-limit). Cert itself is fine; timer will renew later." >&2
-fi
 echo ""

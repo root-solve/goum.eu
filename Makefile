@@ -40,12 +40,16 @@ deploy:
 	@echo "Starting containers on 127.0.0.1:$(HTTP_PORT)…"
 	HTTP_BIND=127.0.0.1 HTTP_PORT=$(HTTP_PORT) $(COMPOSE) up -d --build
 	sudo ENV_FILE="$(abspath $(ENV_FILE))" bash deploy/install-host-apache.sh
-	@if grep -qE '^CONTACT_MAIL=.+@' "$(ENV_FILE)"; then \
+	@if [ -f "/etc/letsencrypt/live/$(DOMAIN)/fullchain.pem" ]; then \
+		echo "TLS cert already present — skip certbot (use: make certbot to force)"; \
+	elif grep -qE '^CONTACT_MAIL=.+@' "$(ENV_FILE)"; then \
 		echo "CONTACT_MAIL set — running certbot…"; \
 		sudo ENV_FILE="$(abspath $(ENV_FILE))" bash deploy/certbot-https.sh; \
 	else \
 		echo "Skip certbot (set CONTACT_MAIL in .env, then: make certbot)"; \
 	fi
+	@curl -sS -o /dev/null -w "backend %{http_code}  public " "http://127.0.0.1:$(HTTP_PORT)/" || true
+	@curl -sS -o /dev/null -w "%{http_code}\n" "$(SITE_URL)/" || true
 	@echo "$(SITE_URL)/"
 
 certbot:

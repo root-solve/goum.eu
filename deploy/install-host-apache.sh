@@ -9,6 +9,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_FILE="${ENV_FILE:-$ROOT/.env}"
 TEMPLATE="$ROOT/deploy/apache-host-vhost.conf"
+SSL_TEMPLATE="$ROOT/deploy/apache-host-ssl.conf"
 HTTP2_CONF="$ROOT/deploy/apache-http2.conf"
 PROXY_TLS_CONF="$ROOT/deploy/apache-proxy-tls.conf"
 SITE_AVAILABLE="/etc/apache2/sites-available"
@@ -175,61 +176,41 @@ mv "${TMP}.mode" "$TMP"
 
 install -m 0644 "$TMP" "$DEST"
 
-# Certbot SSL vhost: must proxy to Docker. After HTTP is switched to
-# "redirect only", Certbot can regenerate le-ssl without ProxyPass → Apache 403.
-SSL_SNIPPET="$ROOT/deploy/apache-ssl-proxy.snippet"
-ensure_ssl_proxy() {
-  local dest="$1"
-  [[ -f "$dest" ]] || return 0
-  grep -q 'SSLEngine on' "$dest" || return 0
-
-  if grep -q 'ProxyPass' "$dest"; then
-    sed -i -E "s#http://127\\.0\\.0\\.1:[0-9]+/#http://127.0.0.1:${HTTP_PORT}/#g" "$dest"
-  else
-    if [[ ! -f "$SSL_SNIPPET" ]]; then
-      echo "Missing SSL proxy snippet: $SSL_SNIPPET" >&2
-      exit 1
-    fi
-    echo "Injecting ProxyPass → 127.0.0.1:${HTTP_PORT} into $(basename "$dest")…"
-    local blockf
-    blockf="$(mktemp)"
-    sed \
-      -e "s/__HTTP_PORT__/${HTTP_PORT}/g" \
-      -e "s/__DOMAIN__/${DOMAIN}/g" \
-      "$SSL_SNIPPET" > "$blockf"
-    awk -v blockfile="$blockf" '
-      /<\/VirtualHost>/ && !done {
-        while ((getline line < blockfile) > 0) print line
-        close(blockfile)
-        done=1
-      }
-      { print }
-    ' "$dest" > "${dest}.tmp"
-    rm -f "$blockf"
-    mv "${dest}.tmp" "$dest"
+# HTTPS: always install our proxy vhost (Certbot's copy of HTTP often has no ProxyPass → 403).
+if [[ "$HAS_CERT" -eq 1 ]]; then
+  if [[ ! -f "$SSL_TEMPLATE" ]]; then
+    echo "Missing SSL template: $SSL_TEMPLATE" >&2
+    exit 1
   fi
-
-  # HTTPS must advertise https to the app (not leftover "http" from bootstrap copy).
-  sed -i 's/RequestHeader set X-Forwarded-Proto "http"/RequestHeader set X-Forwarded-Proto "https"/g' "$dest"
-  if ! grep -q 'X-Forwarded-Proto' "$dest"; then
-    sed -i '/ProxyPreserveHost/a\  RequestHeader set X-Forwarded-Proto "https"\n  RequestHeader set X-Forwarded-Port "443"' "$dest"
-  fi
-  if ! grep -q 'X-Real-IP' "$dest"; then
-    sed -i '/X-Forwarded-Proto/a\  RequestHeader set X-Real-IP %{REMOTE_ADDR}s' "$dest"
-  fi
-}
-
-ensure_ssl_proxy "$SSL_DEST"
-# Also fix enabled symlink target if different path
-if [[ -L "${SITE_ENABLED}/${DOMAIN}-le-ssl.conf" ]]; then
-  ensure_ssl_proxy "$(readlink -f "${SITE_ENABLED}/${DOMAIN}-le-ssl.conf")"
+  sed \
+    -e "s/ServerName goum\\.eu/ServerName ${DOMAIN}/" \
+    -e "s/ServerAlias www\\.goum\\.eu/ServerAlias www.${DOMAIN}/" \
+    -e "s#/etc/letsencrypt/live/goum\\.eu/#/etc/letsencrypt/live/${DOMAIN}/#g" \
+    -e "s#http://127\\.0\\.0\\.1:8090/#http://127.0.0.1:${HTTP_PORT}/#g" \
+    -e "s#http://goum\\.eu/#http://${DOMAIN}/#g" \
+    -e "s#https://goum\\.eu/#https://${DOMAIN}/#g" \
+    -e "s#http://www\\.goum\\.eu/#http://www.${DOMAIN}/#g" \
+    -e "s#https://www\\.goum\\.eu/#https://www.${DOMAIN}/#g" \
+    -e "s/goum\\.eu-ssl-error\\.log/${DOMAIN}-ssl-error.log/g" \
+    -e "s/goum\\.eu-ssl-access\\.log/${DOMAIN}-ssl-access.log/g" \
+    "$SSL_TEMPLATE" > "$TMP"
+  install -m 0644 "$TMP" "$SSL_DEST"
+  echo "Installed HTTPS proxy: ${SSL_DEST} → http://127.0.0.1:${HTTP_PORT}/"
 fi
 
 # Enable only this site — do not a2dissite other vhosts.
 a2ensite "$SITE_FILE" >/dev/null
 if [[ -f "$SSL_DEST" ]]; then
-  a2ensite "${DOMAIN}-le-ssl.conf" >/dev/null 2>&1 || true
+  a2ensite "${DOMAIN}-le-ssl.conf" >/dev/null
 fi
+
+# Docker serves bind-mounted www/ as a non-goum uid — needs traverse on home + read on www.
+path="$ROOT"
+while [[ "$path" != "/" ]]; do
+  chmod o+x "$path" || true
+  path="$(dirname "$path")"
+done
+chmod -R a+rX "$ROOT/www" || true
 
 apache2ctl configtest
 systemctl enable apache2 >/dev/null
@@ -242,15 +223,12 @@ echo "  http :80:   ${HTTP_MODE}"
 if [[ -f "$SSL_DEST" ]]; then
   echo "  https:      ${DOMAIN}-le-ssl.conf → http://127.0.0.1:${HTTP_PORT}/"
 else
-  echo "  https:      (no ${DOMAIN}-le-ssl.conf yet — run make certbot)"
+  echo "  https:      (no cert yet — run make certbot)"
 fi
 echo "  site file:  ${DEST}"
-echo "  http2:      conf-available/http2.conf"
-echo "  proxy tls:  conf-available/${PROXY_TLS_NAME}.conf"
-echo "  email hint: ${CERT_EMAIL:-set CONTACT_MAIL in .env for make certbot}"
+echo "  backend:    curl -sI http://127.0.0.1:${HTTP_PORT}/"
 echo ""
 if [[ "$HAS_CERT" -eq 0 ]]; then
   echo "No Let's Encrypt cert yet. After DNS A/AAAA points here: make certbot"
-  echo "Or re-run make deploy with CONTACT_MAIL set (deploy will call certbot)."
 fi
 echo ""
